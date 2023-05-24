@@ -27,6 +27,7 @@ namespace Pi_the_Robot_test {
         private string[] stepper_commands = new string[] { "Relative move", "Absolute move", "Relative move sync", 
                                                                 "Absolute move sync", "Calibrate"};
         private string[] profile_commands = new string[] { "fast", "medium", "slow" };
+        private string[] stepper_motors = new string[] { "Neck" };
 
 
         private const double MIN_PWM_FREQUENCY = 0.01;   //kHz
@@ -160,6 +161,8 @@ namespace Pi_the_Robot_test {
             comboBox3.SelectedIndex = 0;
             comboBox4.DataSource = profile_commands;
             comboBox4.SelectedIndex = 0;
+            comboBox5.DataSource = stepper_motors;
+            comboBox5.SelectedIndex = 0;
             //
 
             serialPort1.BaudRate = COMBAUD;
@@ -354,11 +357,6 @@ namespace Pi_the_Robot_test {
             }
         }
 
-        private void radioButton19_CheckedChanged(object sender, EventArgs e)
-        {
-
-        }
-
         private void checkBox2_CheckedChanged(object sender, EventArgs e)
         {
             if (checkBox2.Checked == true) {
@@ -397,17 +395,19 @@ namespace Pi_the_Robot_test {
             int data;
             int stepper_command;
             int profile_command;
+            int stepper_motor;
             string command;
 
-            int stepper_no = (int)numericUpDown2.Value;
+            //int stepper_no = (int)numericUpDown2.Value;
             int stepper_angle = (int)numericUpDown5.Value;
 
             // get stepper command
 
+            stepper_motor = (int)comboBox5.SelectedIndex;
             stepper_command = (int)comboBox3.SelectedIndex;
             profile_command = (int)comboBox4.SelectedIndex;
 
-            command = "stepper " + DEFAULT_PORT + " " + (int)stepper_command + " " + stepper_no + " " + stepper_angle + " " + "\n";
+            command = "stepper " + DEFAULT_PORT + " " + (int)stepper_command + " " + stepper_motor + " " + stepper_angle + " " + "\n";
             
 
             InfoWindow.AppendText("Stepper command = " + command + Environment.NewLine);
