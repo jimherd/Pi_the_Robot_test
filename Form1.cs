@@ -6,6 +6,7 @@ using System;
 using System.IO.Ports;
 using System.Threading;
 using System.Windows.Forms;
+using static Pi_the_Robot_test.Command_IO;
 
 namespace Pi_the_Robot_test {
 
@@ -23,6 +24,10 @@ namespace Pi_the_Robot_test {
 
         string com_port;
         private string[] baud_rates = new string[] { "115200", "256000", "230400", "128000", "9600" };
+        private string[] stepper_commands = new string[] { "Relative move", "Absolute move", "Relative move sync", 
+                                                                "Absolute move sync", "Calibrate"};
+        private string[] profile_commands = new string[] { "fast", "medium", "slow" };
+
 
         private const double MIN_PWM_FREQUENCY = 0.01;   //kHz
         private const double MAX_PWM_FREQUENCY = 100.0;  //kHz
@@ -151,9 +156,22 @@ namespace Pi_the_Robot_test {
             //
             comboBox2.DataSource = baud_rates;
             comboBox2.SelectedIndex = 0;
+            comboBox3.DataSource = stepper_commands;
+            comboBox3.SelectedIndex = 0;
+            comboBox4.DataSource = profile_commands;
+            comboBox4.SelectedIndex = 0;
             //
 
             serialPort1.BaudRate = COMBAUD;
+
+            connected = false;
+            button1.Enabled = true;
+            button2.Enabled = false;
+            button3.Enabled = false;
+            button4.Enabled = false;
+            button9.Enabled = false;
+            button10.Enabled = false;
+            button12.Enabled = false;
 
             global_error = SUCCESS;
             Thread.Sleep(2000);
@@ -182,6 +200,7 @@ namespace Pi_the_Robot_test {
             }
             connected = true;
             button2.Enabled = true;
+            button3.Enabled = true;
             button4.Enabled = true;
             button9.Enabled = true;
             button10.Enabled = true;
@@ -280,6 +299,7 @@ namespace Pi_the_Robot_test {
             connected = false;
             button1.Enabled = true;
             button2.Enabled = false;
+            button3.Enabled = false;
             button4.Enabled = false;
             button9.Enabled = false;
             button10.Enabled = false;
@@ -367,6 +387,30 @@ namespace Pi_the_Robot_test {
 
             command = "sync " + DEFAULT_PORT + "\n";
             InfoWindow.AppendText("Servo command = " + command + Environment.NewLine);
+            status = do_command(command, out data);
+            InfoWindow.AppendText("Servo : Return code = " + status + ":: Data = " + data + Environment.NewLine);
+        }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            Command_IO.ErrorCode status = Command_IO.ErrorCode.NO_ERROR;
+            int data;
+            int stepper_command;
+            int profile_command;
+            string command;
+
+            int stepper_no = (int)numericUpDown2.Value;
+            int stepper_angle = (int)numericUpDown5.Value;
+
+            // get stepper command
+
+            stepper_command = (int)comboBox3.SelectedIndex;
+            profile_command = (int)comboBox4.SelectedIndex;
+
+            command = "stepper " + DEFAULT_PORT + " " + (int)stepper_command + " " + stepper_no + " " + stepper_angle + " " + "\n";
+            
+
+            InfoWindow.AppendText("Stepper command = " + command + Environment.NewLine);
             status = do_command(command, out data);
             InfoWindow.AppendText("Servo : Return code = " + status + ":: Data = " + data + Environment.NewLine);
         }

@@ -65,6 +65,14 @@ namespace Pi_the_Robot_test {
             STOP_ALL 
         }
 
+        public enum StepperCommands {
+            REL_MOVE,
+            ABS_MOVE,
+            REL_MOVE_SYNC,
+            ABS_MOVE_SYNC,
+            CALIBRATE,
+        }
+
         //***********************************************************************
         // Objects
         //***********************************************************************
