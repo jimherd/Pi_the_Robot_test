@@ -4,6 +4,7 @@ using Pi_the_Robot_test;
 
 using System.IO.Ports;
 using System.Windows.Forms;
+using static Pi_the_Robot_test.Form1;
 
 namespace Pi_the_Robot_test {
     public class Command_IO {
@@ -11,47 +12,74 @@ namespace Pi_the_Robot_test {
         //***********************************************************************
         // Globals
         //***********************************************************************
-        
-        //Form1 Form_1 = new Form1();   // allow access to Form1 routines
 
         //***********************************************************************
         // Constant definitions
         //***********************************************************************
 
         const int COMBAUD = 115200;  // default baud rate
-        const int READ_TIMEOUT = 10000;   // timeout for read reply (10 seconds)
+        const int READ_TIMEOUT = 100000;   // timeout for read reply (10 seconds)
 
         const int MAX_COMMAND_STRING_LENGTH = 100;
         const int MAX_REPLY_STRING_LENGTH = 100;
         const int MAX_COMMAND_PARAMETERS = 10;
 
+        
         //***********************************************************************
-        // Variables - GLOBAL
-        //***********************************************************************
+        // 
+        public struct arg
+        {
+            public Modes    arg_mode;
+            public int      int_arg;
+            public float    float_arg;
+        }
+        int     argc;
+        public arg[] argv = new arg[MAX_COMMAND_PARAMETERS];
+        public string[] string_parameters = new string[MAX_COMMAND_PARAMETERS];
+
+        public string command_string;
+        public string reply_string;
 
 
         //***********************************************************************
         // Variables - LOCAL
         //***********************************************************************
 
-        public string reply_string;
-        private Int32 param_count;
         public Int32[] int_parameters = new Int32[MAX_COMMAND_PARAMETERS];
         public float[] float_parameters = new float[MAX_COMMAND_PARAMETERS];
-        public string[] string_parameters = new string[MAX_COMMAND_PARAMETERS];
+        // public string[] string_parameters = new string[MAX_COMMAND_PARAMETERS];
         private Modes[] param_type = new Modes[MAX_COMMAND_PARAMETERS];
 
         public enum Modes { MODE_U, MODE_I, MODE_R, MODE_S };
 
         public enum ErrorCode {
-            NO_ERROR = 0,
-            BAD_COMPORT_OPEN = -100,
-            UNKNOWN_COM_PORT = -101,
-            BAD_COMPORT_READ = -102,
-            BAD_COMPORT_WRITE = -103,
-            NULL_EMPTY_STRING = -103,
-            BAD_COMPORT_CLOSE = -104,
-            LAST_ERROR = -104,
+            OK                              = 0,        // uP errors
+            LETTER_ERROR                    = -100,
+            DOT_ERROR                       = -101,
+            PLUSMINUS_ERROR                 = -102,
+            BAD_COMMAND                     = -103,
+            BAD_PORT_NUMBER                 = -104,
+            BAD_NOS_PARAMETERS              = -105,
+            BAD_BASE_PARAMETER              = -106,
+            PARAMETER_OUTWITH_LIMITS        = -107,
+            BAD_SERVO_COMMAND               = -108,
+            STEPPER_CALIBRATE_FAIL          = -109,
+            BAD_STEPPER_COMMAND             = -110,
+            BAD_STEP_VALUE                  = -111,
+            MOVE_ON_UNCALIBRATED_MOTOR      = -112,
+            EXISTING_FAULT_WITH_MOTOR       = -113,
+            SM_MOVE_TOO_SMALL               = -114,
+            LIMIT_SWITCH_ERROR              = -115,
+            UNKNOWN_STEPPER_MOTOR_STATE     = -116,
+            STEPPER_BUSY                    = -117,
+            SERVO_BUSY                      = -118,
+
+            BAD_COMPORT_OPEN                = -200,     // PC errors
+            UNKNOWN_COM_PORT                = -201,
+            BAD_COMPORT_READ                = -202,
+            BAD_COMPORT_WRITE               = -203,
+            NULL_EMPTY_STRING               = -204,
+            BAD_COMPORT_CLOSE               = -205,
         }
 
         public enum ServoCommands
@@ -84,7 +112,6 @@ namespace Pi_the_Robot_test {
         //*********************************************************************
         public Command_IO()
         {
-            //Form1 Form_1 = new Form1();
 
             _serialPort = new SerialPort();    // Create a new SerialPort object
         }
@@ -99,7 +126,7 @@ namespace Pi_the_Robot_test {
         {
             ErrorCode status;
 
-            status = ErrorCode.NO_ERROR;
+            status = ErrorCode.OK;
             _serialPort.BaudRate = baud;
             if (string.IsNullOrEmpty(COM_port)) {
                 return ErrorCode.UNKNOWN_COM_PORT;
@@ -124,7 +151,7 @@ namespace Pi_the_Robot_test {
         {
             ErrorCode status;
 
-            status = ErrorCode.NO_ERROR;
+            status = ErrorCode.OK;
             try {
                 _serialPort.Close();
             }
@@ -134,27 +161,7 @@ namespace Pi_the_Robot_test {
             return status;
         }
 
-        //***********************************************************************
-        // execute_command : format and execute a command to uP/FPGA
-        // ===============
-        //
-        // Parameters
-        //    cmd_name  char  IN   single ASCII character representing uP/FPGA command
-        //    port      int   IN   return address of command
-        //    register  int   IN   register address (0->255) if FPGA command
-        //    in_data   int   IN   data for command  
-        //    out_data  int   OUT  First piece of data returned by executed command
-        //
-        // Returned values
-        //          status         Error value of type 'ErrorCode@
-        //          out_data       int returned from FPGA 
-        public ErrorCode execute_command(char cmd_name, int port, int register, int in_data, out int out_data)
-        {
-            
-            string command_str = cmd_name + " " + port + " " + register + " " + in_data + "\n";
-            ErrorCode status = (do_command(command_str, out out_data));
-            return status;
-        }
+        
 
         //***********************************************************************
         // do_command : execute remote command and get reply
@@ -166,46 +173,48 @@ namespace Pi_the_Robot_test {
         // Returned value
         //          status         Error value of type 'ErrorCode@
 
-        public ErrorCode do_command(string command, out int data)
+        public ErrorCode do_command(out int data)
         {
-            ErrorCode status = ErrorCode.NO_ERROR;
+            ErrorCode status = ErrorCode.OK;
 
-            status = send_command(command);
+            status = send_command();
+
             data = 0;
-            if (status != ErrorCode.NO_ERROR) {
+            if (status != ErrorCode.OK) {
                 return status;
             }
             for (; ; ) {
-                status = get_reply(ref reply_string);
+                status = get_reply();
                 if ((reply_string[0] == 'D') && (reply_string[1] == ':')) {
-                    Form1 frm1 = new Form1();
-                    frm1.DebugPrint(reply_string + Environment.NewLine);
                     continue;
                 }
                 else {
                     break;
                 }
             }
-            if (status != ErrorCode.NO_ERROR) {
+            if (status != ErrorCode.OK) {
                 return status;
             }
             status = parse_parameter_string(reply_string);
-            if (status != ErrorCode.NO_ERROR) {
+            if (status != ErrorCode.OK) {
                 return status;
             }
             data = int_parameters[2];
-            return status;
+            if ((ErrorCode)int_parameters[1] != ErrorCode.OK) {
+                return (ErrorCode)int_parameters[1];
+            }
+            return ErrorCode.OK;
         }
 
         //*********************************************************************** 
         // send_command : Send command string to RP2040 subsystem
         // ============
-        public Command_IO.ErrorCode send_command(string command)
+        public Command_IO.ErrorCode send_command()
         {
-            ErrorCode status = ErrorCode.NO_ERROR;
+            ErrorCode status = ErrorCode.OK;
 
             try {
-                _serialPort.Write(command);
+                _serialPort.Write(command_string);
             }
             catch {
                 status = ErrorCode.BAD_COMPORT_WRITE;
@@ -216,15 +225,15 @@ namespace Pi_the_Robot_test {
         //*********************************************************************** 
         // get_reply : Read a status/data reply string from rp2040 subsystem
         // =========
-        public ErrorCode get_reply(ref string reply)
+        public ErrorCode get_reply()
         {
 
-            ErrorCode status = ErrorCode.NO_ERROR;
+            ErrorCode status = ErrorCode.OK;
 
             //serialPort1.DiscardInBuffer();
             _serialPort.ReadTimeout = READ_TIMEOUT;
             try {
-                reply = _serialPort.ReadLine();
+                reply_string = _serialPort.ReadLine();
             }
             catch (TimeoutException) {
                 status = ErrorCode.BAD_COMPORT_READ;
@@ -245,7 +254,7 @@ namespace Pi_the_Robot_test {
             ErrorCode status;
             Int32 index;
 
-            status = ErrorCode.NO_ERROR;
+            status = ErrorCode.OK;
 
             //
             // check string
@@ -255,31 +264,37 @@ namespace Pi_the_Robot_test {
             }
             //
             //clear parameter data
-
+        
             for (index = 0; index < MAX_COMMAND_PARAMETERS; index++) {
                 int_parameters[index] = 0;
+                argv[index].int_arg = 0;
                 float_parameters[index] = 0.0F;
+                argv[index].float_arg = 0.0F;
                 ;
                 param_type[index] = Modes.MODE_U;
+                argv[index].arg_mode = Modes.MODE_U;
             }
             //
             // split string into individual strings based on SPACE separation
 
-            string_parameters = string_data.Split(new string[] { " ", "\r", "\n" }, MAX_COMMAND_PARAMETERS, StringSplitOptions.RemoveEmptyEntries);
-            param_count = string_parameters.Length;
+          string_parameters = string_data.Split(new string[] { " ", "\r", "\n" }, MAX_COMMAND_PARAMETERS, StringSplitOptions.RemoveEmptyEntries);
+            argc = string_parameters.Length;
             //
             // check each string for INTEGER or REAL values (default is STRING)
 
-            for (index = 0; index < param_count; index++) {
+            for (index = 0; index < argc; index++) {
                 if (Int32.TryParse(string_parameters[index], out int_parameters[index]) == true) {
                     param_type[index] = Modes.MODE_I;
+                    argv[index].arg_mode = Modes.MODE_I;
                     continue;
                 }
                 if (float.TryParse(string_parameters[index], out float_parameters[index]) == true) {
                     param_type[index] = Modes.MODE_R;
+                    argv[index].arg_mode = Modes.MODE_R;
                     continue;
                 }
                 param_type[index] = Modes.MODE_S;
+                argv[index].arg_mode = Modes.MODE_S;
             }
             return status;
         }
@@ -289,39 +304,63 @@ namespace Pi_the_Robot_test {
         // ====
         public ErrorCode Ping(int value, out int data)
         {
-            string command = "ping 0 " + value + "\n";
-            return (do_command(command, out data));
+            command_string = "ping 0 " + value + "\n";
+            return (do_command(out data));
         }
 
-        //*********************************************************************** 
-        // get_sys_data : Read register 0 - holds data on number of I/O units
-        // ============
-        //public ErrorCode get_sys_data()
-        //{
-        //    ErrorCode status;
-        //    int data;
 
-        //    status = (do_command("r 5 0 0\n", out data));
-        //    if (status != ErrorCode.NO_ERROR) {
-        //        return status;
-        //    }
-        //    //
-        //    // update "unit" values
-
-        //    // data = int_parameters[1];
-        //    nos_PWM_units = ((data >> 8) & 0x0F);
-        //    nos_QE_units = ((data >> 12) & 0x0F);
-        //    nos_RC_units = ((data >> 16) & 0x0F);
-        //    //
-        //    // update pointers to first register of each type of unit
-
-        //    SYS_base = 0;
-        //    PWM_base = SYS_base + SYS_REGISTERS;
-        //    QE_base = PWM_base + (nos_PWM_units * REGISTERS_PER_PWM_CHANNEL);
-        //    RC_base = QE_base + (nos_QE_units * REGISTERS_PER_QE_CHANNEL);
-
-        //    return ErrorCode.NO_ERROR;
-        //}
 
     }
 }
+
+//*********************************************************************** 
+// get_sys_data : Read register 0 - holds data on number of I/O units
+// ============
+//public ErrorCode get_sys_data()
+//{
+//    ErrorCode status;
+//    int data;
+
+//    status = (do_command("r 5 0 0\n", out data));
+//    if (status != ErrorCode.OK) {
+//        return status;
+//    }
+//    //
+//    // update "unit" values
+
+//    // data = int_parameters[1];
+//    nos_PWM_units = ((data >> 8) & 0x0F);
+//    nos_QE_units = ((data >> 12) & 0x0F);
+//    nos_RC_units = ((data >> 16) & 0x0F);
+//    //
+//    // update pointers to first register of each type of unit
+
+//    SYS_base = 0;
+//    PWM_base = SYS_base + SYS_REGISTERS;
+//    QE_base = PWM_base + (nos_PWM_units * REGISTERS_PER_PWM_CHANNEL);
+//    RC_base = QE_base + (nos_QE_units * REGISTERS_PER_QE_CHANNEL);
+
+//    return ErrorCode.OK;
+//}
+
+//***********************************************************************
+// execute_command : format and execute a command to uP/FPGA
+// ===============
+//
+// Parameters
+//    cmd_name  char  IN   single ASCII character representing uP/FPGA command
+//    port      int   IN   return address of command
+//    register  int   IN   register address (0->255) if FPGA command
+//    in_data   int   IN   data for command  
+//    out_data  int   OUT  First piece of data returned by executed command
+//
+// Returned values
+//          status         Error value of type 'ErrorCode@
+//          out_data       int returned from FPGA 
+//public ErrorCode execute_command(char cmd_name, int port, int register, int in_data, out int out_data)
+//{
+
+//    command_string = cmd_name + " " + port + " " + register + " " + in_data + "\n";
+//    ErrorCode status = (do_command(out out_data));
+//    return status;
+//}
